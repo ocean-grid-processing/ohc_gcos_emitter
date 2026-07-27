@@ -51,7 +51,7 @@ End-to-end validation is a separate exercise — reproduce [this 2026 result](ht
 
 ### Run
 
-See [`combine.slurm`] for a real run example.
+See [`combine.slurm`](combine.slurm) for a real run example.
 
 #### combine.py options
 
