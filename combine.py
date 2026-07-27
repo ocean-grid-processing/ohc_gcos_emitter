@@ -2,8 +2,8 @@
 """Combine mapped-layer ohc_derive outputs into the GCOS/WMO-report deliverable.
 
     python combine.py DERIVE_*.nc --gcos-tag "GCOS 2026 OP20260127b" \
-        [--levels 0_300,0_700,700_2000,0_2000] [--baseline 2004:2025 --ref-window 2005:2024] \
-        [--j-to-zj 1e-15] [--reference shallowest] [--out DIR]
+        [--levels 0_300,0_700,700_2000,0_2000] [--ref-window 2005:2024] \
+        [--j-to-zj 1e-21] [--reference shallowest] [--collaborators STR] [--out DIR]
 
 Each DERIVE_*.nc is one mapped layer's ohc_derive output, built with
 `derive.py ... --transforms integral,area --no-ensemble`. The combined layers, their
