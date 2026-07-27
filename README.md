@@ -1,6 +1,6 @@
 # ohc_combine
 
-`ohc_combine` combines mapped-layer `ohc_derive` outputs into **combined depth layers** and exports the GCOS/WMO-report deliverable: `gcos<tag>_LocalGP_Giglio_etal_using<b0>_<b1>baseline.nc`. It's the single-product tail of the pipeline, and it ports `WMO2024_create_tseries_with_uq_for_combined.m` + `WMO2024_create_tseries_to_Karina_for_WMOreport.m`.
+`ohc_combine` combines mapped-layer `ohc_derive` outputs into **combined depth layers** and exports the GCOS/WMO-report deliverable: `gcos<tag>_LocalGP_Giglio_etal_using<b0>_<b1>baseline.nc`.
 
 ```
 ohc_ingest ─▶ publish (--preset wmo) ─▶ ohc_derive (integral,area --no-ensemble) ─▶ ohc_combine ─▶ GCOS .nc
@@ -30,49 +30,28 @@ where `d_yr(y)` is the annual mean of `total_L(t)/area_L` (TJ/m²). `cp0`/`rho0`
 
 ## Combined layers (config)
 
-The combined-layer table — each level's contributors, `n_fac`, `dz` — lives in [`layers.py`](layers.py); edit it there to add or remove layers, and `--levels` selects a subset per run. Current table: `0_300`, `0_700`, `0_1000` (net-new), `700_2000`, `0_2000`. The collaborator's reference file predates `0_1000`, so you reproduce it with the other four.
+The combined-layer table — each level's contributors, `n_fac`, `dz` — lives in [`layers.py`](layers.py); edit it there to add or remove layers, and `--levels` selects a subset per run. Current table: `0_300`, `0_700`, `0_1000`, `700_2000`, `0_2000`.
 
 ## Usage
 
 ### Environment
 
-```bash
-pip install -r requirements.txt          # numpy, xarray>=2024.10, netCDF4
-```
+See `Dockerfile` for a containerized environment; build the same into an anaconda env on blanca for running on the CU cluster.
 
 ### Test
 
-Analytic checks on synthetic inputs — no data files, no cluster:
+Basic unit tests run locally in a container:
 
 ```bash
-pip install -r requirements.txt -r requirements-dev.txt   # adds pytest, pandas
-pytest
+docker image build -t ohc_combine:test .
+docker container run -v $(pwd):/app ohc_combine:test pytest
 ```
 
-They cover the combine arithmetic (weighted total, shallowest-contributor area, volume), the guards (`dz`↔bounds, missing contributor, unimplemented `--reference`), and the export (baseline-zero-mean, the three quantity formulas, the PJ-vs-ZJ factor). End-to-end validation is a separate exercise — reproduce the collaborator's `.nc` and diff it (match `GCOS_area`/`GCOS_volume` first, then the series) with [`parity.py`](parity.py).
+End-to-end validation is a separate exercise — reproduce [this 2026 result](https://zenodo.org/records/18187866) and diff it (match `GCOS_area`/`GCOS_volume` first, then the series) with [`parity.py`](parity.py).
 
 ### Run
 
-Combine consumes one `ohc_derive` output per **mapped** layer, so a full run is three steps: publish each layer with the WMO domain, derive its `integral`+`area`, then combine. For the reference file (the four original levels) you need **five** mapped layers — `700_1000` is only for `0_1000`.
-
-```bash
-# 1. publish each mapped layer with the WMO domain. --preset wmo drops fully-dry cells but keeps
-#    partial continental-slope cells (see ohc_ingest for the preset). Mean-only stores are fine.
-python ../ohc_ingest/scripts/publish.py STORE_15_20.zarr --experiment B --product LocalGP --preset wmo
-# ... repeat: 15_300, 300_700, 700_1850, 1800_1850   (+ 700_1000 if you also want 0_1000)
-
-# 2. derive the horizontal integral + area for each, central-only (the deliverable has no error bars):
-python ../ohc_derive/derive.py OHC_..._lev15_20_..._LocalGP.nc --transforms integral,area --no-ensemble --out derive/
-# ... one per mapped layer
-
-# 3. combine → the GCOS deliverable (the four original levels):
-python combine.py derive/derive_*.nc \
-    --gcos-tag "GCOS 2026 OP20260127b" \
-    --levels 0_300,0_700,700_2000,0_2000 \
-    --ref-window 2005:2024 --out .
-```
-
-Output: `gcos2026op20260127b_LocalGP_Giglio_etal_using2005_2024baseline.nc` — dim `years`, with `GCOS_<lo>_<hi>_{OHCA_J_m2_oc, OHCA_ZJ, vol_ave_temp_anom}` per level and `GCOS_area`/`GCOS_volume` attributes.
+See [`combine.slurm`] for a real run example.
 
 #### combine.py options
 

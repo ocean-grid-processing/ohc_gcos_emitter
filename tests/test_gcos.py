@@ -49,8 +49,10 @@ def test_true_zj_constant():
                  "area": area, "volume": vol}]
     pj = gcos.build_dataset(combined, 3989.244, 1030.0, (2005, 2005), 1e-15, "T", "X")
     zj = gcos.build_dataset(combined, 3989.244, 1030.0, (2005, 2005), 1e-21, "T", "X")
-    r = pj["GCOS_0000_2000_OHCA_ZJ"].values / zj["GCOS_0000_2000_OHCA_ZJ"].values
-    assert np.allclose(r[np.isfinite(r)], 1e6)   # PJ is 1e6x the true ZJ
+    # PJ column == ZJ column × 1e6, elementwise (incl. the baseline year where both are exactly 0);
+    # a direct scaled-equality check avoids the 0/0 a ratio would hit there.
+    assert np.allclose(pj["GCOS_0000_2000_OHCA_ZJ"].values,
+                       zj["GCOS_0000_2000_OHCA_ZJ"].values * 1e6)
 
 
 def test_filename_matches_convention():
