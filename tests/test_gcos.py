@@ -1,5 +1,6 @@
 """GCOS export: baseline-anomaly zero-mean, the three quantity formulas, attrs, filename."""
 import numpy as np
+import xarray as xr
 
 import gcos
 from conftest import monthly_total
@@ -58,3 +59,35 @@ def test_true_zj_constant():
 def test_filename_matches_convention():
     assert (gcos.filename("GCOS 2026 OP20260127b", (2005, 2024))
             == "gcos2026op20260127b_LocalGP_Giglio_etal_using2005_2024baseline.nc")
+
+
+def test_sd_columns_propagate_through_same_factors():
+    area, vol = 1e14, 3e16
+    cp0, rho0 = 3989.244, 1030.0
+    years = [2004, 2005, 2006]
+    tsy = xr.DataArray([10.0, 20.0, 30.0], dims=("year",), coords={"year": years})  # combined SD, TJ
+    combined = [{"name": "0_2000", "low": 0, "high": 2000,
+                 "total": monthly_total(area, {2004: 1e-4, 2005: 2e-4, 2006: 3e-4}),
+                 "area": area, "volume": vol, "total_sd_yearly": tsy}]
+    ds = gcos.build_dataset(combined, cp0, rho0, (2005, 2006), 1e-21, "T", "X")
+
+    jm2_sd = ds["GCOS_0000_2000_OHCA_J_m2_oc_sd"].values
+    # J/m^2 SD = combined yearly SD / area × 1e12 (TJ → TJ/m^2 → J/m^2)
+    assert np.allclose(jm2_sd, np.array([10.0, 20.0, 30.0]) / area * 1e12)
+    # ZJ / °C SDs use the same multipliers as the values
+    assert np.allclose(ds["GCOS_0000_2000_OHCA_ZJ_sd"].values, 1e-21 * area * jm2_sd)
+    assert np.allclose(ds["GCOS_0000_2000_vol_ave_temp_anom_sd"].values,
+                       area * jm2_sd / (cp0 * rho0 * vol))
+    # SD is non-negative and NOT baseline-subtracted (positive even in a baseline year)
+    assert np.all(jm2_sd > 0)
+    assert ds["GCOS_0000_2000_OHCA_ZJ_sd"].attrs["GCOS_area"] == area
+    assert ds["GCOS_0000_2000_vol_ave_temp_anom_sd"].attrs["GCOS_volume"] == vol
+
+
+def test_no_sd_columns_without_ensemble():
+    area, vol = 1e14, 3e16
+    combined = [{"name": "0_300", "low": 0, "high": 300,
+                 "total": monthly_total(area, {2004: 0.0, 2005: 1e-3}),
+                 "area": area, "volume": vol, "total_sd_yearly": None}]
+    ds = gcos.build_dataset(combined, 3989.244, 1030.0, (2005, 2005), 1e-21, "T", "X")
+    assert not any(v.endswith("_sd") for v in ds.data_vars)

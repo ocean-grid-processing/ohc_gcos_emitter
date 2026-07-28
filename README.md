@@ -3,7 +3,7 @@
 `ohc_combine` combines mapped-layer `ohc_derive` outputs into **combined depth layers** and exports the GCOS/WMO-report deliverable: `gcos<tag>_LocalGP_Giglio_etal_using<b0>_<b1>baseline.nc`.
 
 ```
-ohc_ingest ─▶ publish (--preset wmo) ─▶ ohc_derive (integral,area --no-ensemble) ─▶ ohc_combine ─▶ GCOS .nc
+ohc_ingest ─▶ publish (--preset wmo) ─▶ ohc_derive (integral,area) ─▶ ohc_combine ─▶ GCOS .nc
 ```
 
 ## What it computes
@@ -22,11 +22,19 @@ The **export** then, per layer, takes the annual mean of the density `total_L/ar
 
 ```
 OHCA_J_m2_oc(y)      = (d_yr(y) − mean(d_yr over --ref-window)) × 1e12   # TJ/m² → J/m²
-OHCA_ZJ(y)           = j_to_zj · area_L · OHCA_J_m2_oc(y)                # ZJ  (see Decisions)
+OHCA_ZJ(y)           = j_to_zj · area_L · OHCA_J_m2_oc(y)                # ZJ  (see Opinionated choices)
 vol_ave_temp_anom(y) = area_L · OHCA_J_m2_oc(y) / (cp0·rho0·volume_L)    # °C
 ```
 
-where `d_yr(y)` is the annual mean of `total_L(t)/area_L` (TJ/m²). `cp0`/`rho0` come from the derive inputs' attributes (and must agree across them). Full output layout: [`combine_schema.md`](combine_schema.md).
+where `d_yr(y)` is the annual mean of `total_L(t)/area_L` (TJ/m²). `cp0`/`rho0` come from the derive inputs' attributes (and must agree across them).
+
+**Error bars.** If the derive inputs were built with `--keep-members integral` (each carrying `ohc_integral_ens`), every value also gets a `*_sd` companion. Per layer, the error is the ensemble std of the **yearly** integral — yearly-mean per member, then std across members (ddof=1) — and those combine by the same weights, as a **worst-case linear sum** (contributors treated as fully correlated):
+
+```
+total_sd_L(y) = Σᵢ n_facᵢ · integral_sd_yearlyᵢ(y)      # TJ
+```
+
+pushed through the same factors as the value to give `OHCA_J_m2_oc_sd`, `OHCA_ZJ_sd`, `vol_ave_temp_anom_sd`. The SD is of the absolute yearly value (not baseline-subtracted), matching the original `data_yearly_std`. It's all-or-nothing: if any contributor lacks an ensemble, `combine.py` errors rather than silently drop a term.
 
 ## Combined layers (config)
 
@@ -59,7 +67,7 @@ All configuration is on the command line — no env, no config file. The one "co
 
 | option | default | effect |
 |---|---|---|
-| `DERIVE_*.nc` (positional, 1+) | *(required)* | the `ohc_derive` outputs, one per **mapped** layer, each built with `--transforms integral,area --no-ensemble`. All contributors needed by the selected levels must be present (else a clear error). |
+| `DERIVE_*.nc` (positional, 1+) | *(required)* | the `ohc_derive` outputs, one per **mapped** layer, each built with `--transforms integral,area` (add `--keep-members integral` for `*_sd` error bars). All contributors needed by the selected levels must be present (else a clear error). |
 | `--gcos-tag` | *(required)* | e.g. `"GCOS 2026 OP20260127b"` — lowercased/space-stripped for the filename, and (with `--collaborators`) the global `description`. |
 | `--levels` | all in `layers.py` | comma list of combined levels to emit (e.g. `0_300,0_700,700_2000,0_2000`). |
 | `--ref-window` | `2005:2024` | baseline-mean window `YEAR0:YEAR1` subtracted from the yearly series; also names the file (`using<b0>_<b1>baseline`). Separator `-` or `:`. |
@@ -76,5 +84,5 @@ A few things this step decides for you that aren't obvious from the output — w
 
 - **`OHCA_ZJ` is true zettajoules** (`--j-to-zj`, default `1e-21`). The original scaled by `1e-15`, which is J→**peta**joules — its `_ZJ` column is mislabelled and 10⁶× too large. We emit real ZJ by decision; pass `--j-to-zj 1e-15` to byte-match the original on that one column. `OHCA_J_m2_oc` and `vol_ave_temp_anom` are unaffected.
 - **Reference area = shallowest contributor** (`--reference shallowest`, the only mode). For the `0_X` layers that equals the uniform 300 m bathymetry floor from ingest, so a 300–2000 m shelf cell sits in the `0_2000` denominator carrying no deep water. "Bottom-must-be-wet" (`--reference deepest|intersection`) needs per-layer gridded masks and raises `NotImplementedError` — a deliberate follow-up, not a silent denominator swap.
-- **No uncertainty.** The deliverable carries none, so it's `--no-ensemble` throughout — the mean field alone (central values are byte-identical either way).
-- **float64 mean.** OHC is float64 end to end (ingest → publish `--dtype float64`, the default), so the large-mean anomaly cancellation keeps full precision; the 100-member ensemble stays float32 (it only feeds `_sd`, unused here).
+- **Error bars are a worst-case linear sum.** When the derive inputs carry ensembles, each value gets `*_sd = Σ n_fac · (per-layer yearly ensemble std)` — layers treated as fully correlated, matching the original `create_eval_string_std`. It's a deliberate over-estimate, not independent-error (root-sum-square) propagation, and it's all-or-nothing (a missing contributor ensemble errors loudly rather than dropping a term). Central values are byte-identical whether or not the ensemble is on.
+- **float64 mean.** OHC is float64 end to end (ingest → publish `--dtype float64`, the default), so the large-mean anomaly cancellation keeps full precision; the 100-member ensemble stays float32 (it only feeds the `_sd` spread).
