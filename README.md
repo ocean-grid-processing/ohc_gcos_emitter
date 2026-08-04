@@ -1,14 +1,14 @@
-# ohc_combine
+# ohc_gcos_emitter
 
-`ohc_combine` combines mapped-layer `ohc_derive` outputs into **combined depth layers** and exports the GCOS/WMO-report deliverable: `gcos<tag>_LocalGP_Giglio_etal_using<b0>_<b1>baseline.nc`.
+`ohc_gcos_emitter` combines mapped-layer `ohc_derive` outputs into **combined depth layers** and exports the GCOS/WMO-report deliverable: `gcos<tag>_LocalGP_Giglio_etal_using<b0>_<b1>baseline.nc`.
 
 ```
-ohc_ingest ─▶ publish (--preset wmo) ─▶ ohc_derive (integral,area) ─▶ ohc_combine ─▶ GCOS .nc
+ohc_ingest ─▶ publish (--preset wmo) ─▶ ohc_derive (integral,area) ─▶ ohc_gcos_emitter ─▶ GCOS .nc
 ```
 
 ## What it computes
 
-Combination happens on the **already-integrated 1-D series**, not on grids — `ohc_combine` never touches a map. Each mapped layer's `ohc_derive` output hands it two numbers per timestep: `ohc_integral(time)` in TJ (the area-weighted horizontal integral, = the original's `dᵢ·areaTotᵢ`) and the scalar `area_total` in m² (= `areaTotᵢ`). For a combined layer whose contributors are listed shallowest-first (in `layers.py`):
+Combination happens on the **already-integrated 1-D series**, not on grids — `ohc_gcos_emitter` never touches a map. Each mapped layer's `ohc_derive` output hands it two numbers per timestep: `ohc_integral(time)` in TJ (the area-weighted horizontal integral, = the original's `dᵢ·areaTotᵢ`) and the scalar `area_total` in m² (= `areaTotᵢ`). For a combined layer whose contributors are listed shallowest-first (in `layers.py`):
 
 ```
 total_L(t) = Σᵢ n_facᵢ · integralᵢ(t)                    # TJ   — the combined heat content
@@ -51,8 +51,8 @@ See `Dockerfile` for a containerized environment; build the same into an anacond
 Basic unit tests run locally in a container:
 
 ```bash
-docker image build -t ohc_combine:test .
-docker container run -v $(pwd):/app ohc_combine:test pytest
+docker image build -t ohc_gcos_emitter:test .
+docker container run -v $(pwd):/app ohc_gcos_emitter:test pytest
 ```
 
 End-to-end validation is a separate exercise — reproduce [this 2026 result](https://zenodo.org/records/18187866) and diff it (match `GCOS_area`/`GCOS_volume` first, then the series) with [`parity.py`](parity.py).
