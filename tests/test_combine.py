@@ -51,3 +51,35 @@ def test_missing_contributor_raises():
     lv = Level("0_300", (Contributor("15_20", 3, 5), Contributor("15_300", 1, 285)))
     with pytest.raises(SystemExit):
         aggregate.combine_level(lv, by)
+
+
+def test_sd_is_nfac_weighted_linear_sum():
+    # two contributors carrying yearly SDs -> combined total_sd_yearly = Σ n_fac · sd_i, per year
+    by = {
+        "15_20": make_layer("15_20", 15, 20, 100.0, [2.0] * 24, sd_yearly={2004: 1.0, 2005: 2.0}),
+        "15_300": make_layer("15_300", 15, 300, 80.0, [5.0] * 24, sd_yearly={2004: 0.5, 2005: 1.5}),
+    }
+    lv = Level("0_300", (Contributor("15_20", 3, 5), Contributor("15_300", 1, 285)))
+    tsy = aggregate.combine_level(lv, by)["total_sd_yearly"]
+    assert np.allclose(tsy.sel(year=2004).values, 3 * 1.0 + 1 * 0.5)
+    assert np.allclose(tsy.sel(year=2005).values, 3 * 2.0 + 1 * 1.5)
+
+
+def test_sd_none_when_a_contributor_lacks_ensemble():
+    by = {
+        "15_20": make_layer("15_20", 15, 20, 100.0, [2.0] * 12, sd_yearly={2004: 1.0}),
+        "15_300": make_layer("15_300", 15, 300, 80.0, [5.0] * 12),   # no ensemble
+    }
+    lv = Level("0_300", (Contributor("15_20", 3, 5), Contributor("15_300", 1, 285)))
+    assert aggregate.combine_level(lv, by)["total_sd_yearly"] is None
+
+
+def test_uncertainty_available_all_none_and_partial_raises():
+    a_sd = make_layer("a", 0, 10, 1.0, [1.0], sd_yearly={2004: 1.0})
+    b_sd = make_layer("b", 0, 10, 1.0, [1.0], sd_yearly={2004: 1.0})
+    b_plain = make_layer("b", 0, 10, 1.0, [1.0])
+    assert aggregate.uncertainty_available(["a", "b"], {"a": a_sd, "b": b_sd}) is True
+    assert aggregate.uncertainty_available(["a", "b"],
+                                           {"a": make_layer("a", 0, 10, 1.0, [1.0]), "b": b_plain}) is False
+    with pytest.raises(SystemExit):                              # partial mix -> loud error
+        aggregate.uncertainty_available(["a", "b"], {"a": a_sd, "b": b_plain})

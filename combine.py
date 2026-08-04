@@ -6,9 +6,9 @@
         [--j-to-zj 1e-21] [--reference shallowest] [--collaborators STR] [--out DIR]
 
 Each DERIVE_*.nc is one mapped layer's ohc_derive output, built with
-`derive.py ... --transforms integral,area --no-ensemble`. The combined layers, their
-contributors, and the n_fac/dz weights live in layers.py (edit there to add/remove layers;
-`--levels` selects a subset). See combine_schema.md.
+`derive.py ... --transforms integral,area` (add `--keep-members integral` for error bars). The
+combined layers, their contributors, and the n_fac/dz weights live in layers.py (edit there to
+add/remove layers; `--levels` selects a subset). See the README.
 
 Requires: numpy, xarray>=2024.10, netCDF4.
 """
@@ -63,6 +63,9 @@ def main():
         raise SystemExit("missing derive inputs for contributor layer(s): %s "
                          "(needed by %s)" % (absent, [lv.name for lv in levels]))
 
+    # Uncertainty is all-or-nothing across the needed contributors (raises on a partial mix).
+    uncertainty = aggregate.uncertainty_available(need, by_tag)
+
     combined = [aggregate.combine_level(lv, by_tag, reference=args.reference) for lv in levels]
     ds = gcos.build_dataset(combined, cp0, rho0, ref_window, args.j_to_zj,
                             args.gcos_tag, args.collaborators)
@@ -72,6 +75,7 @@ def main():
     ds.to_netcdf(path, engine="netcdf4")
     print("wrote", path)
     print("levels:", ", ".join(lv.name for lv in levels))
+    print("uncertainty:", "on — _sd columns written" if uncertainty else "off (mean-only inputs)")
 
 
 if __name__ == "__main__":

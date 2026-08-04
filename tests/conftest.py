@@ -13,14 +13,23 @@ def months(n, start="2004-01"):
     return pd.date_range(start, periods=n, freq="MS").values
 
 
-def make_layer(tag, top, bottom, area, integral_values, cp0=3989.244, rho0=1030.0):
-    """A read_layer()-shaped dict for combine tests (no file IO)."""
+def make_layer(tag, top, bottom, area, integral_values, sd_yearly=None,
+               cp0=3989.244, rho0=1030.0):
+    """A read_layer()-shaped dict for combine tests (no file IO).
+
+    `sd_yearly`, if given, is a {year: sd} dict → the layer's `integral_sd_yearly` (year,) [TJ].
+    """
     t = months(len(integral_values))
     integ = xr.DataArray(np.asarray(integral_values, dtype="float64"),
                          dims=("time",), coords={"time": t})
+    sd = None
+    if sd_yearly is not None:
+        yrs = np.array(sorted(sd_yearly), dtype="int64")
+        sd = xr.DataArray(np.array([sd_yearly[y] for y in yrs], dtype="float64"),
+                          dims=("year",), coords={"year": yrs})
     return {"tag": tag, "integral": integ, "area": float(area),
             "top": top, "bottom": bottom, "cp0": cp0, "rho0": rho0,
-            "product": "TEST", "period": "2004_2004"}
+            "product": "TEST", "period": "2004_2004", "integral_sd_yearly": sd}
 
 
 def monthly_total(area, yearly_density):
