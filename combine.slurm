@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=12:00:00
-#SBATCH --job-name=ohc_combine
+#SBATCH --job-name=ohc_gcos_emitter
 #SBATCH --output=%x.%j.out
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=katie.mills@colorado.edu

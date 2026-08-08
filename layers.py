@@ -1,4 +1,4 @@
-"""Combined-layer configuration for ohc_combine.
+"""Combined-layer configuration for ohc_gcos_emitter.
 
 Each combined layer is a weighted sum of mapped ("contributor") layers, listed shallowest-first.
 The shallowest contributor sets the reference area (the GCOS denominator). `n_fac` scales a thin

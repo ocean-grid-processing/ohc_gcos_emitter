@@ -7,9 +7,9 @@ For every shared variable it reports the max absolute and max relative differenc
 against --rtol, and it compares the GCOS_area / GCOS_volume attributes. It handles the two known,
 intentional differences:
 
-  * OHCA_ZJ — we default to *true* zettajoules (j_to_zj = 1e-21) while the original used 1e-15
-    (which is actually petajoules), so our `_ZJ` column is 1e6x smaller. The script detects this
-    and reports the reconciled (x1e6) comparison for those variables.
+  * OHCA_ZJ (and its OHCA_ZJ_sd companion) — we default to *true* zettajoules (j_to_zj = 1e-21)
+    while the original used 1e-15 (which is actually petajoules), so both `_ZJ` columns are 1e6x
+    smaller. The script detects this and reports the reconciled (x1e6) comparison for them.
   * Extra levels — if either file has a level the other lacks (e.g. our aspirational 0_1000),
     it's listed as ours-only / theirs-only and skipped rather than counted as a mismatch.
 
@@ -55,7 +55,7 @@ def main():
     for v in shared:
         ad, rd = maxdiff(o[v].values, t[v].values)
         note = ""
-        if v.endswith("_OHCA_ZJ"):                 # reconcile true-ZJ (ours) vs PJ (theirs)
+        if "_OHCA_ZJ" in v:                        # reconcile true-ZJ (ours) vs PJ (theirs); value + _sd
             ad6, rd6 = maxdiff(o[v].values * 1e6, t[v].values)
             if rd6 < rd:
                 ad, rd, note = ad6, rd6, "x1e6 true-ZJ↔PJ"
