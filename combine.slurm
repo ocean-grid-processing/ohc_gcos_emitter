@@ -18,5 +18,5 @@ conda activate ohc_crosscheck
 cd $SLURM_SUBMIT_DIR
 python combine.py \
   data/*.nc \
-  --gcos-tag "GCOS 2026 OP20260127b-redo-with-ensemble" \
+  --gcos-tag "GCOS 2026 OP20260127b-redo-zenodo" \
   --levels 0_300,0_700,700_2000,0_2000
