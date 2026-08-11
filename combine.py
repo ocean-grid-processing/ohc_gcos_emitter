@@ -39,6 +39,11 @@ def main():
                          "byte-match the original file, whose _ZJ column is actually petajoules.")
     ap.add_argument("--reference", default="shallowest",
                     help="combined-layer reference area (only 'shallowest' implemented)")
+    ap.add_argument("--provenance-tag", default=None,
+                    help="provenance id written to the header (e.g. the localGP run + component "
+                         "git hashes)")
+    ap.add_argument("--provenance-link", default=None,
+                    help="URL/path to the provenance record for this output")
     ap.add_argument("--out", default=".")
     args = ap.parse_args()
 
@@ -69,6 +74,10 @@ def main():
     combined = [aggregate.combine_level(lv, by_tag, reference=args.reference) for lv in levels]
     ds = gcos.build_dataset(combined, cp0, rho0, ref_window, args.j_to_zj,
                             args.gcos_tag, args.collaborators)
+    if args.provenance_tag is not None:
+        ds.attrs["provenance_tag"] = args.provenance_tag       # localGP run + component git hashes
+    if args.provenance_link is not None:
+        ds.attrs["provenance_link"] = args.provenance_link     # URL/path to the provenance record
 
     os.makedirs(args.out, exist_ok=True)
     path = os.path.join(args.out, gcos.filename(args.gcos_tag, ref_window))
