@@ -81,9 +81,9 @@ def build_dataset(combined, cp0, rho0, baseline, j_to_zj, gcos_tag, collaborator
 
 
 def filename(gcos_tag, baseline):
-    """Original convention: <tag>_LocalGP_Giglio_etal_using<b0>_<b1>baseline.nc.
+    """`gcos_<tag>_<b0>_<b1>.nc` — `b0`/`b1` are the baseline-window years.
 
     `gcos_tag` is already whitespace-sanitized by the CLI and is used verbatim (case preserved, no
     munging) so it matches the provenance record char-for-char."""
     b0, b1 = baseline
-    return "%s_LocalGP_Giglio_etal_using%d_%dbaseline.nc" % (gcos_tag, b0, b1)
+    return "gcos_%s_%d_%d.nc" % (gcos_tag, b0, b1)

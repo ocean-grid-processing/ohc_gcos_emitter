@@ -57,10 +57,10 @@ def test_true_zj_constant():
 
 
 def test_filename_matches_convention():
-    # gcos.filename takes an already-sanitized tag and uses it verbatim — case preserved, no munging
-    # (the CLI strips whitespace once, upstream). The tag must match the provenance record exactly.
+    # gcos_<tag>_<b0>_<b1>.nc — tag verbatim (case preserved, no munging; the CLI strips whitespace
+    # once, upstream), then the baseline-window years.
     assert (gcos.filename("GCOS2026OP20260127b", (2005, 2024))
-            == "GCOS2026OP20260127b_LocalGP_Giglio_etal_using2005_2024baseline.nc")
+            == "gcos_GCOS2026OP20260127b_2005_2024.nc")
 
 
 def test_sd_columns_propagate_through_same_factors():
