@@ -1,6 +1,6 @@
 # ohc_gcos_emitter
 
-`ohc_gcos_emitter` combines mapped-layer `ohc_derive` outputs into **combined depth layers** and exports the GCOS/WMO-report deliverable: `gcos<tag>_LocalGP_Giglio_etal_using<b0>_<b1>baseline.nc`.
+`ohc_gcos_emitter` combines mapped-layer `ohc_derive` outputs into **combined depth layers** and exports the GCOS/WMO-report deliverable: `<tag>_LocalGP_Giglio_etal_using<b0>_<b1>baseline.nc` (leading token = `--tag`, whitespace-stripped but otherwise verbatim; `LocalGP` here is a fixed naming-convention literal).
 
 ```
 ohc_ingest ─▶ publish (--preset wmo) ─▶ ohc_derive (integral,area) ─▶ ohc_gcos_emitter ─▶ GCOS .nc
@@ -68,12 +68,13 @@ All configuration is on the command line — no env, no config file. The one "co
 | option | default | effect |
 |---|---|---|
 | `DERIVE_*.nc` (positional, 1+) | *(required)* | the `ohc_derive` outputs, one per **mapped** layer, each built with `--transforms integral,area` (add `--keep-members integral` for `*_sd` error bars). All contributors needed by the selected levels must be present (else a clear error). |
-| `--gcos-tag` | *(required)* | e.g. `"GCOS 2026 OP20260127b"` — lowercased/space-stripped for the filename, and (with `--collaborators`) the global `description`. |
+| `--tag` | *(required)* | provenance tag, e.g. `GCOS-2026-OP20260127b` — the leading filename token (whitespace-stripped, case preserved, no other munging), the global `description` prefix (with `--collaborators`), and the `provenance_tag` header attr (pointer to the provenance record). Must match the provenance record char-for-char. |
+| `--provenance-link` | *(none)* | URL/path to the provenance record; written to the `provenance_link` header attr. |
 | `--levels` | all in `layers.py` | comma list of combined levels to emit (e.g. `0_300,0_700,700_2000,0_2000`). |
 | `--ref-window` | `2005:2024` | baseline-mean window `YEAR0:YEAR1` subtracted from the yearly series; also names the file (`using<b0>_<b1>baseline`). Separator `-` or `:`. |
 | `--j-to-zj` | `1e-21` | `OHCA_ZJ` scale — `1e-21` = true zettajoules (default); `1e-15` byte-matches the original's (mislabelled petajoule) `_ZJ` column. |
 | `--reference` | `shallowest` | combined-layer reference-area policy. Only `shallowest` is implemented; `deepest`/`intersection` raise `NotImplementedError` (they need gridded per-layer masks). |
-| `--collaborators` | `LocalGP by Giglio, Sukianto, Kuusela, Mills` | the `description` suffix (`"<gcos-tag>, <collaborators>"`). |
+| `--collaborators` | `LocalGP by Giglio, Sukianto, Kuusela, Mills` | the `description` suffix (`"<tag>, <collaborators>"`). |
 | `--out` | `.` | output directory (created if absent). |
 
 `cp0`/`rho0` are **not** options — they're read from the derive inputs' attributes.

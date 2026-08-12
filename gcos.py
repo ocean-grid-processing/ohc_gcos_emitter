@@ -81,7 +81,9 @@ def build_dataset(combined, cp0, rho0, baseline, j_to_zj, gcos_tag, collaborator
 
 
 def filename(gcos_tag, baseline):
-    """Original convention: <gcos_tag lowercased, spaces removed>_LocalGP_Giglio_etal_using<b0>_<b1>baseline.nc"""
+    """Original convention: <tag>_LocalGP_Giglio_etal_using<b0>_<b1>baseline.nc.
+
+    `gcos_tag` is already whitespace-sanitized by the CLI and is used verbatim (case preserved, no
+    munging) so it matches the provenance record char-for-char."""
     b0, b1 = baseline
-    return "%s_LocalGP_Giglio_etal_using%d_%dbaseline.nc" % (
-        gcos_tag.lower().replace(" ", ""), b0, b1)
+    return "%s_LocalGP_Giglio_etal_using%d_%dbaseline.nc" % (gcos_tag, b0, b1)

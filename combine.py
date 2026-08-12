@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Combine mapped-layer ohc_derive outputs into the GCOS/WMO-report deliverable.
 
-    python combine.py DERIVE_*.nc --gcos-tag "GCOS 2026 OP20260127b" \
+    python combine.py DERIVE_*.nc --tag "GCOS-2026-OP20260127b" [--provenance-link URL] \
         [--levels 0_300,0_700,700_2000,0_2000] [--ref-window 2005:2024] \
         [--j-to-zj 1e-21] [--reference shallowest] [--collaborators STR] [--out DIR]
 
@@ -25,6 +25,12 @@ def parse_window(s):
     return (a, b)
 
 
+def _sanitize_tag(tag):
+    """Strip all whitespace from a provenance tag; never lowercase or otherwise munge it — it must
+    match the provenance record char-for-char."""
+    return "".join(tag.split())
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("derive", nargs="+", help="ohc_derive .nc files, one per mapped layer")
@@ -32,20 +38,20 @@ def main():
                     help="comma list of combined levels to emit (default: all in layers.py)")
     ap.add_argument("--ref-window", default="2005:2024",
                     help="baseline-mean window YEAR0:YEAR1 removed from the yearly series")
-    ap.add_argument("--gcos-tag", required=True, help='e.g. "GCOS 2026 OP20260127b"')
+    ap.add_argument("--tag", required=True,
+                    help='provenance tag: leading filename token AND the provenance_tag header attr, '
+                         'e.g. "GCOS-2026-OP20260127b"')
     ap.add_argument("--collaborators", default="LocalGP by Giglio, Sukianto, Kuusela, Mills")
     ap.add_argument("--j-to-zj", default=1e-21, type=float,
                     help="OHCA_ZJ scale; 1e-21 = true zettajoules (default). Pass 1e-15 to "
                          "byte-match the original file, whose _ZJ column is actually petajoules.")
     ap.add_argument("--reference", default="shallowest",
                     help="combined-layer reference area (only 'shallowest' implemented)")
-    ap.add_argument("--provenance-tag", default=None,
-                    help="provenance id written to the header (e.g. the localGP run + component "
-                         "git hashes)")
     ap.add_argument("--provenance-link", default=None,
-                    help="URL/path to the provenance record for this output")
+                    help="URL/path to the provenance record; written to the provenance_link header attr")
     ap.add_argument("--out", default=".")
     args = ap.parse_args()
+    args.tag = _sanitize_tag(args.tag)
 
     names = None if not args.levels else [s.strip() for s in args.levels.split(",")]
     levels = layers_mod.select_levels(names)
@@ -73,14 +79,13 @@ def main():
 
     combined = [aggregate.combine_level(lv, by_tag, reference=args.reference) for lv in levels]
     ds = gcos.build_dataset(combined, cp0, rho0, ref_window, args.j_to_zj,
-                            args.gcos_tag, args.collaborators)
-    if args.provenance_tag is not None:
-        ds.attrs["provenance_tag"] = args.provenance_tag       # localGP run + component git hashes
+                            args.tag, args.collaborators)
+    ds.attrs["provenance_tag"] = args.tag                      # run token; pointer to provenance record
     if args.provenance_link is not None:
         ds.attrs["provenance_link"] = args.provenance_link     # URL/path to the provenance record
 
     os.makedirs(args.out, exist_ok=True)
-    path = os.path.join(args.out, gcos.filename(args.gcos_tag, ref_window))
+    path = os.path.join(args.out, gcos.filename(args.tag, ref_window))
     ds.to_netcdf(path, engine="netcdf4")
     print("wrote", path)
     print("levels:", ", ".join(lv.name for lv in levels))
