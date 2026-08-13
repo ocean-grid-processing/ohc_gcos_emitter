@@ -16,5 +16,5 @@ module load anaconda/2023.09
 conda activate ohc_crosscheck
 
 cd $SLURM_SUBMIT_DIR
-python combine.py /scratch/alpine/wimi7695/ohc_prod/results/derive_${1}-gcos_2004_2025_lev* --tag $1 --provenance-link https://github.com/argovis/ohc_gcos_emitter/releases/tag/$1 \
---levels 0_300,0_700,0_1000,700_2000,0_2000 --ref-window 2005:2024
+python combine.py /scratch/alpine/wimi7695/ohc_prod/results/derive_${1}-gcos_2004_2025_lev* --tag $1 --provenance-link https://github.com/argovis/ohc_gcos_emitter/blob/main/provenance/README.md \
+  --levels 0_300,0_700,0_1000,700_2000,0_2000 --ref-window 2005:2024
