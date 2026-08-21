@@ -1,89 +1,125 @@
-"""GCOS/WMO-report export: yearly baseline anomaly + the three quantities.
+#!/usr/bin/env python3
+"""GCOS/WMO-report packaging: ohc_derive blobs -> one combined GCOS deliverable.
 
-Mirrors WMO2024_create_tseries_to_Karina_for_WMOreport.m. Per combined layer, from the combined
-`total(t)` (TJ), `area` (m^2), `volume` (m^3): take the annual mean of the density (total/area),
-subtract the baseline-window mean, and express that anomaly three ways.
+The factory has done the analysis — the n_fac cross-layer combine, the annual mean, and the OHCA
+baseline window. Each per-level blob carries `ohca` (annual anomaly, basin-integrated TJ, referenced
+to its baseline window) plus `area_m2`, `volume_m3`, `cp0`, `rho0`, and the `time_window` it was built
+with. This step packages one file spanning every level, expressing each level's anomaly three ways:
 
-    OHCA_J_m2_oc(y)      = d_yr(y) - mean(d_yr over baseline)          [J/m^2]
-    OHCA_ZJ(y)           = j_to_zj * area * OHCA_J_m2_oc(y)            [see note on j_to_zj]
-    vol_ave_temp_anom(y) = area * OHCA_J_m2_oc(y) / (cp0*rho0*volume) [degC]
+    GCOS_<lo>_<hi>_OHCA_J_m2_oc(y)      = ohca / area * 1e12                       [J/m^2]
+    GCOS_<lo>_<hi>_OHCA_ZJ(y)           = j_to_zj * area * OHCA_J_m2_oc            [ZJ, see note]
+    GCOS_<lo>_<hi>_vol_ave_temp_anom(y) = area * OHCA_J_m2_oc / (cp0*rho0*volume)  [degC]
 
-The anomaly is a large-mean cancellation (absolute OHC minus its baseline mean), so it is done in
-float64. Our internal OHC is TJ/m^2 while the original is J/m^2, so densities are scaled by 1e12
-at this boundary to land on the original's numbers.
+Each gets a `*_sd` companion when the blob carried the ensemble — the factory's `ohca_sd` pushed
+through the same deterministic factors. Note that `ohca_sd` is the spread of the *anomaly* members
+(each demeaned by its own window), the factory's convention; the retired emitter used the spread of
+the absolute yearly value instead.
 
-If a combined layer carries `total_sd_yearly` (every contributor had an ensemble), each quantity
-also gets a `*_sd` companion — the combined yearly SD pushed through the same deterministic factors
-(`/area`, `*1e12`, `*j_to_zj*area`, `*area/(cp0*rho0*volume)`). The SD is of the absolute yearly
-value, not baseline-subtracted, matching the original's `data_yearly_std`.
-
-NOTE on j_to_zj: the original uses 1e-15, which is J->PJ (petajoules), not J->ZJ (that would be
-1e-21) — so its `_ZJ` column is actually in petajoules (1e6x the true ZJ). We default to 1e-21 so
-`OHCA_ZJ` is genuine, correctly-labelled zettajoules (a deliberate correction, per project
-decision). Pass 1e-15 to byte-match the collaborator's original file on that column.
+NOTE on j_to_zj: the original uses 1e-15, which is J->PJ (petajoules), not J->ZJ (1e-21) — so its
+`_ZJ` column is actually petajoules. We default to 1e-21 for genuine zettajoules (a deliberate
+correction); pass 1e-15 to byte-match the collaborator's original file on that column.
 """
+import argparse
+import os
+
 import numpy as np
 import xarray as xr
 
-
-def _yearly(series):
-    """Monthly (time,) series -> calendar-year mean (year,), float64."""
-    return series.astype("float64").groupby("time.year").mean("time")
+J_PER_TJ = 1e12
 
 
-def build_dataset(combined, cp0, rho0, baseline, j_to_zj, gcos_tag, collaborators):
-    """Assemble the GCOS Dataset from a list of combine_level() results.
+def _band(level):
+    """A level name "lo_hi" -> the zero-padded GCOS band token "0000_0300"."""
+    lo, hi = (int(x) for x in level.split("_"))
+    return "%04d_%04d" % (lo, hi)
 
-    `baseline` is (year0, year1) inclusive. Returns an xr.Dataset with dim `years` and, per
-    level, `GCOS_<lo>_<hi>_{OHCA_J_m2_oc, OHCA_ZJ, vol_ave_temp_anom}` plus GCOS_area/GCOS_volume
-    attributes and a global `description`.
+
+def build_dataset(blobs, j_to_zj, tag, provenance_link):
+    """The combined GCOS Dataset over `years`, three views per level, from the factory blobs.
+
+    Every blob must share the year axis, the baseline window, and cp0/rho0 (the deliverable is one
+    consistent set of levels); mismatches raise.
     """
-    b0, b1 = baseline
-    years = None
+    years = window = cp0 = rho0 = None
     data_vars = {}
-    for cl in combined:
-        d_yr = _yearly(cl["total"] / cl["area"])                 # TJ/m^2, yearly, float64
-        yrs = d_yr["year"].values.astype("int64")
+    for blob in blobs:
+        yrs = blob["ohca"]["year"].values.astype("int64")
         if years is None:
-            years = yrs
-        elif not np.array_equal(yrs, years):
-            raise SystemExit("year axes differ across levels (%s vs %s)" % (yrs, years))
+            years, window = yrs, blob.attrs["time_window"]
+            cp0, rho0 = float(blob.attrs["cp0"]), float(blob.attrs["rho0"])
+        else:
+            if not np.array_equal(yrs, years):
+                raise SystemExit("year axes differ across levels (at %s)" % blob.attrs["level"])
+            if blob.attrs["time_window"] != window:
+                raise SystemExit("baseline windows differ across levels (%s vs %s)"
+                                 % (blob.attrs["time_window"], window))
+            if (float(blob.attrs["cp0"]), float(blob.attrs["rho0"])) != (cp0, rho0):
+                raise SystemExit("cp0/rho0 differ across levels (at %s)" % blob.attrs["level"])
 
-        base = d_yr.sel(year=slice(b0, b1)).mean("year")
-        anom_jm2 = (d_yr - base).values * 1e12                   # TJ/m^2 -> J/m^2, float64
-        area, vol = cl["area"], cl["volume"]
-        tag = "%04d_%04d" % (cl["low"], cl["high"])
+        area, vol = float(blob.attrs["area_m2"]), float(blob.attrs["volume_m3"])
+        band = _band(blob.attrs["level"])
+        anom_jm2 = blob["ohca"].values / area * J_PER_TJ         # TJ -> J/m^2, float64
 
-        data_vars["GCOS_%s_OHCA_J_m2_oc" % tag] = xr.DataArray(
-            anom_jm2, dims=("years",), attrs={"GCOS_area": area})
-        data_vars["GCOS_%s_OHCA_ZJ" % tag] = xr.DataArray(
-            j_to_zj * area * anom_jm2, dims=("years",), attrs={"GCOS_area": area})
-        data_vars["GCOS_%s_vol_ave_temp_anom" % tag] = xr.DataArray(
-            area * anom_jm2 / (cp0 * rho0 * vol), dims=("years",), attrs={"GCOS_volume": vol})
+        data_vars["GCOS_%s_OHCA_J_m2_oc" % band] = xr.DataArray(
+            anom_jm2, dims=("years",), attrs={"units": "J/m2", "GCOS_area": area})
+        data_vars["GCOS_%s_OHCA_ZJ" % band] = xr.DataArray(
+            j_to_zj * area * anom_jm2, dims=("years",), attrs={"units": "ZJ", "GCOS_area": area})
+        data_vars["GCOS_%s_vol_ave_temp_anom" % band] = xr.DataArray(
+            area * anom_jm2 / (cp0 * rho0 * vol), dims=("years",),
+            attrs={"units": "degC", "GCOS_volume": vol})
 
-        # Uncertainty (only if every contributor carried an ensemble): the combined SD of the
-        # yearly density, pushed through the *same* deterministic factors as the values. The SD is
-        # of the absolute yearly value (not baseline-subtracted), matching the original data_yearly_std.
-        tsy = cl.get("total_sd_yearly")
-        if tsy is not None:
-            jm2_sd = tsy.sel(year=years).values / area * 1e12    # TJ -> TJ/m^2 -> J/m^2
-            note = "worst-case ensemble 1-sigma: linear n_fac-weighted sum of per-layer yearly SDs"
-            data_vars["GCOS_%s_OHCA_J_m2_oc_sd" % tag] = xr.DataArray(
-                jm2_sd, dims=("years",), attrs={"GCOS_area": area, "comment": note})
-            data_vars["GCOS_%s_OHCA_ZJ_sd" % tag] = xr.DataArray(
-                j_to_zj * area * jm2_sd, dims=("years",), attrs={"GCOS_area": area, "comment": note})
-            data_vars["GCOS_%s_vol_ave_temp_anom_sd" % tag] = xr.DataArray(
-                area * jm2_sd / (cp0 * rho0 * vol), dims=("years",), attrs={"GCOS_volume": vol, "comment": note})
+        if "ohca_sd" in blob:
+            jm2_sd = blob["ohca_sd"].values / area * J_PER_TJ
+            note = "worst-case ensemble 1-sigma: n_fac-weighted sum of the per-constituent SDs"
+            data_vars["GCOS_%s_OHCA_J_m2_oc_sd" % band] = xr.DataArray(
+                jm2_sd, dims=("years",), attrs={"units": "J/m2", "GCOS_area": area, "comment": note})
+            data_vars["GCOS_%s_OHCA_ZJ_sd" % band] = xr.DataArray(
+                j_to_zj * area * jm2_sd, dims=("years",),
+                attrs={"units": "ZJ", "GCOS_area": area, "comment": note})
+            data_vars["GCOS_%s_vol_ave_temp_anom_sd" % band] = xr.DataArray(
+                area * jm2_sd / (cp0 * rho0 * vol), dims=("years",),
+                attrs={"units": "degC", "GCOS_volume": vol, "comment": note})
 
     out = xr.Dataset(data_vars, coords={"years": ("years", years.astype("float64"))})
-    out.attrs["description"] = "%s, %s" % (gcos_tag, collaborators)
+    out.attrs["time_window"] = window
+    out.attrs["provenance_tag"] = tag
+    if provenance_link is not None:
+        out.attrs["provenance_link"] = provenance_link
     return out
 
 
-def filename(gcos_tag, baseline):
-    """`gcos_<tag>_<b0>_<b1>.nc` — `b0`/`b1` are the baseline-window years.
+def filename(tag, window):
+    """gcos_<tag>_<window>.nc — window is the baseline label carried by the blobs (e.g. 2005_2024)."""
+    return "gcos_%s_%s.nc" % (tag, window.replace("-", "_"))
 
-    `gcos_tag` is already whitespace-sanitized by the CLI and is used verbatim (case preserved, no
-    munging) so it matches the provenance record char-for-char."""
-    b0, b1 = baseline
-    return "gcos_%s_%d_%d.nc" % (gcos_tag, b0, b1)
+
+def main():
+    ap = argparse.ArgumentParser(description="GCOS packaging: ohc_derive blobs -> GCOS deliverable")
+    ap.add_argument("blobs", nargs="+", help="ohc_derive outputs, one per synthetic level")
+    ap.add_argument("--tag", required=True, help="provenance tag: filename token + provenance_tag attr")
+    ap.add_argument("--provenance-link", default=None, help="URL/path to the provenance record")
+    ap.add_argument("--j-to-zj", default=1e-21, type=float,
+                    help="OHCA_ZJ scale; 1e-21 = true zettajoules (default). Pass 1e-15 to byte-match "
+                         "the original file, whose _ZJ column is actually petajoules.")
+    ap.add_argument("--out", default=".")
+    cfg = ap.parse_args()
+    cfg.tag = "".join(cfg.tag.split())                           # whitespace-stripped, otherwise verbatim
+
+    blobs = [xr.open_dataset(p) for p in cfg.blobs]
+    for p, b in zip(cfg.blobs, blobs):
+        if "ohca" not in b.data_vars:
+            raise SystemExit("%s carries no ohca; run ohc_derive with --quantities ohca" % p)
+        if b.attrs.get("time_window", "all") == "all":
+            raise SystemExit("%s has no baseline window; GCOS needs ohc_derive run with --time-window" % p)
+        if "cp0" not in b.attrs or "rho0" not in b.attrs:
+            raise SystemExit("%s lacks cp0/rho0; GCOS needs the physical constants" % p)
+
+    out = build_dataset(blobs, cfg.j_to_zj, cfg.tag, cfg.provenance_link)
+    os.makedirs(cfg.out, exist_ok=True)
+    dest = os.path.join(cfg.out, filename(cfg.tag, out.attrs["time_window"]))
+    out.to_netcdf(dest, engine="netcdf4")
+    print("wrote", dest)
+
+
+if __name__ == "__main__":
+    main()
