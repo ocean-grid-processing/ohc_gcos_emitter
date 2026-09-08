@@ -18,8 +18,10 @@ conda activate ohc_crosscheck
 # One ohc_derive blob per synthetic level, each built with --time-window 2005:2024 (the GCOS baseline);
 # gcos.py reads the window off the blobs. $1 is the provenance tag.
 cd $SLURM_SUBMIT_DIR
+tag=xxx
+results=/scratch/alpine/wimi7695/ohc_prod/results
 python gcos.py \
-  /scratch/alpine/wimi7695/ohc_prod/results/derive_${1}_*.nc \
+  ${results}/derive_${tag}_*.nc \
   --tag $1 \
-  --provenance-link https://github.com/argovis/ohc_gcos_emitter/releases/tag/$1 \
-  --out out
+  --provenance-link https://github.com/argovis/ohc_gcos_emitter/releases/tag/${tag} \
+  --out $results
