@@ -20,8 +20,10 @@ conda activate ohc_crosscheck
 cd $SLURM_SUBMIT_DIR
 tag=xxx
 results=/scratch/alpine/wimi7695/ohc_prod/results
+window=2005_2024          # gcos baseline; the glob must pick this window, not a whole-record derive
 python gcos.py \
-  ${results}/derive_${tag}_*.nc \
+  ${results}/derive_${tag}_${window}_*.nc \
   --tag $1 \
   --provenance-link https://github.com/argovis/ohc_gcos_emitter/releases/tag/${tag} \
+  --code-version https://github.com/argovis/ohc_gcos_emitter/commit/REPLACE_WITH_DEPLOYED_SHA \
   --out $results

@@ -81,7 +81,7 @@ first, then the series) with [`parity.py`](parity.py).
 ### Run
 
 ```bash
-python gcos.py derive_<tag>_*.nc --tag GCOS-2026-OP20260127b [--provenance-link URL] [--j-to-zj 1e-21] [--out DIR]
+python gcos.py derive_<tag>_*.nc --tag GCOS-2026-OP20260127b --code-version URL [--provenance-link URL] [--j-to-zj 1e-21] [--out DIR]
 ```
 
 See [`gcos.slurm`](gcos.slurm) for a real run.
@@ -93,8 +93,32 @@ See [`gcos.slurm`](gcos.slurm) for a real run.
 | `derive_*.nc` (positional, 1+) | *(required)* | `ohc_derive` blobs, one per synthetic level; each must carry `ohca` and a real `time_window`. They all go into one file. |
 | `--tag` | *(required)* | provenance tag (e.g. `GCOS-2026-OP20260127b`): the filename token (whitespace-stripped, case preserved, no other munging) and the `provenance_tag` header attr. |
 | `--provenance-link` | *(none)* | URL/path to the provenance record; written to the `provenance_link` attr. |
+| `--code-version` | *(required)* | URL to the exact ohc_gcos_emitter code (commit/release); written to the `ohc_gcos_emitter_code_version` attr. |
 | `--j-to-zj` | `1e-21` | `OHCA_ZJ` scale — `1e-21` = true zettajoules; `1e-15` byte-matches the original's (mislabelled petajoule) `_ZJ` column. |
 | `--out` | `.` | output directory (created if absent). |
+
+**Provenance chain.** GCOS combines every level into one file, so it is a cross-level fan-in. The whole
+chain is folded into **one** `config_record` attribute keyed by stage:
+
+```
+config_record = {
+  "localgp_ingest":  {"run_config": {shared + per_constituent}, …},   # collapsed across levels
+  "localgp_publish": {…},
+  "ohc_derive":      {"run_config": {shared + per_level}, …},         # genuinely per-level
+  "ohc_gcos_emitter":{"run_config": {resolved args}, "run_facts": {levels, window, j_to_zj, …}, "code_version": "…"}
+}
+```
+
+*Why one attribute:* many separate global attributes tip HDF5 into **dense (fractal-heap) attribute
+storage**, whose layout some netcdf builds mis-read; a single attribute keeps the file at ≤ 8 global
+attributes, i.e. **compact** storage, which every reader handles. `provenance_tag` / `provenance_link`
+stay separate as the run's discoverable identity.
+
+The forwarded blocks are DRY'd on both axes: the `localgp_*` blocks arrive as `{level: {constituent:
+block}}` but a constituent's block is level-independent, so the level axis collapses to `shared` +
+`per_constituent` (a constituent appears once, not once per level); the `ohc_derive_*` blocks are
+genuinely per-level, so they become `shared` + `per_level` (or a bare value when the levels agree).
+Lossless, driven by the `constituents` roster in `ohc_derive.run_facts`.
 
 The baseline `<b0>_<b1>` in the filename comes from the blobs' `time_window` — no `--ref-window`.
 Level selection is by which blobs you pass — no `--levels`. The reference area is the factory
