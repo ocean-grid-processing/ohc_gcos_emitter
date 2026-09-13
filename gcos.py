@@ -194,9 +194,16 @@ def build_dataset(blobs, j_to_zj, tag, provenance_link):
     return out
 
 
-def filename(tag, window):
-    """gcos_<tag>_<window>.nc — window is the baseline label carried by the blobs (e.g. 2005_2024)."""
-    return "gcos_%s_%s.nc" % (tag, window.replace("-", "_"))
+def _file_token(years, window):
+    """Combined filename token `<data>_tw<baseline>`: the data span (from the shared year axis) then the
+    baseline window (always set for GCOS). Both `YYYY_YYYY`, e.g. `2005_2024_tw2005_2024`."""
+    data = "%d_%d" % (int(years.min()), int(years.max()))
+    return "%s_tw%s" % (data, window.replace("-", "_"))
+
+
+def filename(tag, token):
+    """gcos_<tag>_<data>_tw<baseline>.nc."""
+    return "gcos_%s_%s.nc" % (tag, token)
 
 
 def main():
@@ -226,7 +233,7 @@ def main():
     out = build_dataset(blobs, cfg.j_to_zj, cfg.tag, cfg.provenance_link)
     stamp_config_record(out, blobs, cfg)                        # whole chain -> one config_record attr
     os.makedirs(cfg.out, exist_ok=True)
-    dest = os.path.join(cfg.out, filename(cfg.tag, out.attrs["time_window"]))
+    dest = os.path.join(cfg.out, filename(cfg.tag, _file_token(out["years"].values, out.attrs["time_window"])))
     out.to_netcdf(dest, engine="netcdf4")
     print("wrote", dest)
 

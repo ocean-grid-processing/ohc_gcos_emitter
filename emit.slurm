@@ -21,8 +21,10 @@ cd $SLURM_SUBMIT_DIR
 tag=260908-OP20260507
 results=/scratch/alpine/wimi7695/ohc_prod/results_260908
 window=$1
+# derive names carry the data span too (derive_<tag>_<data>_tw<baseline>_<level>.nc); $window is the
+# baseline, so glob the data span in front of it (and the level after).
 python gcos.py \
-  ${results}/derive_${tag}_${window}_*.nc \
+  ${results}/derive_${tag}_*_tw${window}_*.nc \
   --tag $1 \
   --provenance-link https://github.com/ocean-grid-processing/provenance/blob/main/README.md \
   --code-version https://github.com/ocean-grid-processing/ohc_ohca_ohu_emitter/releases/tag/1.0.0 \

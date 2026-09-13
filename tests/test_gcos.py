@@ -112,7 +112,11 @@ def test_cp0_rho0_mismatch_errors():
 
 
 def test_filename():
-    assert gcos.filename("dev", "2005-2024") == "gcos_dev_2005_2024.nc"
+    assert gcos.filename("dev", "2005_2006_tw2005_2024") == "gcos_dev_2005_2006_tw2005_2024.nc"
+
+
+def test_file_token_carries_data_span_and_baseline():
+    assert gcos._file_token(np.array([2005, 2006]), "2005-2024") == "2005_2006_tw2005_2024"
 
 
 def test_round_trip_through_files(tmp_path):
@@ -120,7 +124,7 @@ def test_round_trip_through_files(tmp_path):
     _blob().to_netcdf(src)
     blob = xr.open_dataset(src)
     out = gcos.build_dataset([blob], 1e-21, "dev", None)
-    dest = str(tmp_path / gcos.filename("dev", out.attrs["time_window"]))
+    dest = str(tmp_path / gcos.filename("dev", gcos._file_token(out["years"].values, out.attrs["time_window"])))
     out.to_netcdf(dest)
     back = xr.open_dataset(dest)
     assert "GCOS_0000_2000_OHCA_ZJ" in back.data_vars

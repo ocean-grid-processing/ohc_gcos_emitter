@@ -1,8 +1,9 @@
 # ohc_gcos_emitter
 
 `ohc_gcos_emitter` packages `ohc_derive` blobs into the GCOS/WMO-report deliverable — one NetCDF
-spanning every level, `gcos_<tag>_<b0>_<b1>.nc`, where `<tag>` is the provenance tag
-(whitespace-stripped, otherwise verbatim) and `<b0>_<b1>` are the baseline-window years.
+spanning every level, `gcos_<tag>_<data>_tw<baseline>.nc`, where `<tag>` is the provenance tag
+(whitespace-stripped, otherwise verbatim), `<data>` (`YYYY_YYYY`) is the data span, and `tw<baseline>`
+(`twYYYY_YYYY`) is the baseline-window years.
 
 ```
 ohc_ingest ─▶ publish ─▶ ohc_derive (--quantities ohca --time-window 2005:2024) ─▶ ohc_gcos_emitter ─▶ GCOS .nc
@@ -120,7 +121,7 @@ block}}` but a constituent's block is level-independent, so the level axis colla
 genuinely per-level, so they become `shared` + `per_level` (or a bare value when the levels agree).
 Lossless, driven by the `constituents` roster in `ohc_derive.run_facts`.
 
-The baseline `<b0>_<b1>` in the filename comes from the blobs' `time_window` — no `--ref-window`.
+The `<data>` span in the filename comes from the blobs' shared year axis and `tw<baseline>` from their `time_window` — no `--ref-window`.
 Level selection is by which blobs you pass — no `--levels`. The reference area is the factory
 footprint (the shallowest wet area) — no `--reference`.
 
