@@ -25,7 +25,7 @@ window=$1
 # baseline, so glob the data span in front of it (and the level after).
 python gcos.py \
   ${results}/derive_${tag}_*_tw${window}_*.nc \
-  --tag $1 \
+  --tag ${tag} \
   --provenance-link https://github.com/ocean-grid-processing/provenance/blob/main/README.md \
-  --code-version https://github.com/ocean-grid-processing/ohc_ohca_ohu_emitter/releases/tag/1.0.0 \
+  --code-version https://github.com/ocean-grid-processing/ohc_gcos_emitter/releases/tag/1.0.0 \
   --out $results
