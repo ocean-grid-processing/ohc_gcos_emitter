@@ -120,9 +120,10 @@ def stamp_config_record(out, blobs, cfg):
     for parts in record.values():
         for name, by_level in list(parts.items()):
             parts[name] = _dry_part(by_level, constituents)
-    # this step's own block (singleton — no level axis)
+    # this step's own block (singleton — no level axis). citation has its own top-level attr, so keep it
+    # out of the brick (not duplicated); project/author stay in run_config for the record.
     record[STAGE] = {
-        "run_config": vars(cfg),
+        "run_config": {k: v for k, v in vars(cfg).items() if k != "citation"},
         "run_facts": {
             "levels": [blob.attrs.get("level") for blob in blobs],
             "time_window": out.attrs.get("time_window"),
@@ -141,7 +142,7 @@ def _band(level):
     return "%04d_%04d" % (lo, hi)
 
 
-def build_dataset(blobs, j_to_zj, tag, provenance_link):
+def build_dataset(blobs, j_to_zj, tag, provenance_link, citation=""):
     """The combined GCOS Dataset over `years`, three views per level, from the factory blobs.
 
     Every blob must share the year axis, the baseline window, and cp0/rho0 (the deliverable is one
@@ -191,6 +192,7 @@ def build_dataset(blobs, j_to_zj, tag, provenance_link):
     out.attrs["provenance_tag"] = tag
     if provenance_link is not None:
         out.attrs["provenance_link"] = provenance_link
+    out.attrs["citation"] = citation
     return out
 
 
@@ -201,9 +203,9 @@ def _file_token(years, window):
     return "%s_tw%s" % (data, window.replace("-", "_"))
 
 
-def filename(tag, token):
-    """gcos_<tag>_<data>_tw<baseline>.nc."""
-    return "gcos_%s_%s.nc" % (tag, token)
+def filename(tag, token, project, author):
+    """gcos_<tag>_<data>_tw<baseline>_<project>_<author>.nc (project/author last before .nc)."""
+    return "gcos_%s_%s_%s_%s.nc" % (tag, token, project, author)
 
 
 def main():
@@ -217,9 +219,19 @@ def main():
     ap.add_argument("--j-to-zj", default=1e-21, type=float,
                     help="OHCA_ZJ scale; 1e-21 = true zettajoules (default). Pass 1e-15 to byte-match "
                          "the original file, whose _ZJ column is actually petajoules.")
+    ap.add_argument("--project", required=True,
+                    help="project string, the first of the filename's trailing pair and in config_record "
+                         "(e.g. LocalGP)")
+    ap.add_argument("--author", required=True,
+                    help="author string, the last of the filename's trailing pair and in config_record "
+                         "(e.g. Giglio_etal2026)")
+    ap.add_argument("--citation", required=True,
+                    help="citation sentence; written to the top-level `citation` attr")
     ap.add_argument("--out", default=".")
     cfg = ap.parse_args()
     cfg.tag = "".join(cfg.tag.split())                           # whitespace-stripped, otherwise verbatim
+    cfg.project = "".join(cfg.project.split())                   # filename tokens: whitespace-stripped,
+    cfg.author = "".join(cfg.author.split())                     # case preserved, no other munging
 
     blobs = [xr.open_dataset(p) for p in cfg.blobs]
     for p, b in zip(cfg.blobs, blobs):
@@ -230,10 +242,11 @@ def main():
         if "cp0" not in b.attrs or "rho0" not in b.attrs:
             raise SystemExit("%s lacks cp0/rho0; GCOS needs the physical constants" % p)
 
-    out = build_dataset(blobs, cfg.j_to_zj, cfg.tag, cfg.provenance_link)
+    out = build_dataset(blobs, cfg.j_to_zj, cfg.tag, cfg.provenance_link, cfg.citation)
     stamp_config_record(out, blobs, cfg)                        # whole chain -> one config_record attr
     os.makedirs(cfg.out, exist_ok=True)
-    dest = os.path.join(cfg.out, filename(cfg.tag, _file_token(out["years"].values, out.attrs["time_window"])))
+    dest = os.path.join(cfg.out, filename(cfg.tag, _file_token(out["years"].values, out.attrs["time_window"]),
+                                          cfg.project, cfg.author))
     out.to_netcdf(dest, engine="netcdf4")
     print("wrote", dest)
 
