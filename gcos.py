@@ -142,7 +142,7 @@ def _band(level):
     return "%04d_%04d" % (lo, hi)
 
 
-def build_dataset(blobs, j_to_zj, tag, provenance_link, citation=""):
+def build_dataset(blobs, j_to_zj, tag, provenance_link, citation="", project=""):
     """The combined GCOS Dataset over `years`, three views per level, from the factory blobs.
 
     Every blob must share the year axis, the baseline window, and cp0/rho0 (the deliverable is one
@@ -193,6 +193,8 @@ def build_dataset(blobs, j_to_zj, tag, provenance_link, citation=""):
     if provenance_link is not None:
         out.attrs["provenance_link"] = provenance_link
     out.attrs["citation"] = citation
+    if project:
+        out.attrs["project"] = project        # top-level discoverable (also in config_record)
     return out
 
 
@@ -242,7 +244,7 @@ def main():
         if "cp0" not in b.attrs or "rho0" not in b.attrs:
             raise SystemExit("%s lacks cp0/rho0; GCOS needs the physical constants" % p)
 
-    out = build_dataset(blobs, cfg.j_to_zj, cfg.tag, cfg.provenance_link, cfg.citation)
+    out = build_dataset(blobs, cfg.j_to_zj, cfg.tag, cfg.provenance_link, cfg.citation, cfg.project)
     stamp_config_record(out, blobs, cfg)                        # whole chain -> one config_record attr
     os.makedirs(cfg.out, exist_ok=True)
     dest = os.path.join(cfg.out, filename(cfg.tag, _file_token(out["years"].values, out.attrs["time_window"]),

@@ -26,7 +26,7 @@ def test_config_record_consolidates_two_axes(tmp_path):
         "ohc_derive_code_version": "https://github.com/argovis/ohc_derive/commit/d",
     })
     out = gcos.build_dataset([b0700, b2000], j_to_zj=1e-21, tag="G", provenance_link="http://g",
-                             citation="Giglio et al. (2026)")
+                             citation="Giglio et al. (2026)", project="LocalGP")
     cfg = types.SimpleNamespace(blobs=["d0.nc", "d1.nc"], tag="G", provenance_link="http://g",
                                 j_to_zj=1e-21, code_version="https://x/commit/gggg", out=str(tmp_path),
                                 project="LocalGP", author="Giglio_etal2026", citation="Giglio et al. (2026)")
@@ -53,6 +53,7 @@ def test_config_record_consolidates_two_axes(tmp_path):
     assert rec["ohc_gcos_emitter"]["run_config"]["author"] == "Giglio_etal2026"
     assert "citation" not in rec["ohc_gcos_emitter"]["run_config"]
     assert out.attrs["citation"] == "Giglio et al. (2026)"          # standalone top-level attr
+    assert out.attrs["project"] == "LocalGP"                        # top-level too
 
 
 def _blob(level="0_2000", area=1e12, vol=1e15, window="2005-2024", with_sd=True):

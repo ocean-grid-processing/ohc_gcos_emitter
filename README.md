@@ -101,7 +101,7 @@ See [`gcos.slurm`](gcos.slurm) for a real run.
 | `--provenance-link` | *(none)* | URL/path to the provenance record; written to the `provenance_link` attr. |
 | `--code-version` | *(required)* | URL to the exact ohc_gcos_emitter code (commit/release); written to the `ohc_gcos_emitter_code_version` attr. |
 | `--j-to-zj` | `1e-21` | `OHCA_ZJ` scale — `1e-21` = true zettajoules; `1e-15` byte-matches the original's (mislabelled petajoule) `_ZJ` column. |
-| `--project` | *(required)* | project string; first of the filename's trailing pair (whitespace-stripped, case preserved) and recorded in `config_record`. |
+| `--project` | *(required)* | project string; first of the filename's trailing pair (whitespace-stripped, case preserved), a standalone top-level `project` attr, and recorded in `config_record`. |
 | `--author` | *(required)* | author string; last of the filename's trailing pair (e.g. `Giglio_etal2026`) and recorded in `config_record`. |
 | `--citation` | *(required)* | citation sentence; written to the standalone top-level `citation` attr (kept out of `config_record` so it isn't duplicated). |
 | `--out` | `.` | output directory (created if absent). |
