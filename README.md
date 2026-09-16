@@ -1,9 +1,9 @@
 # ohc_gcos_emitter
 
 `ohc_gcos_emitter` packages `ohc_derive` blobs into the GCOS/WMO-report deliverable — one NetCDF
-spanning every level, `gcos_<tag>_<data>_tw<baseline>_<project>_<author>.nc`, where `<tag>` is the
+spanning every level, `gcos_<tag>_<data>_tw<baseline>_<product_name>_<author>.nc`, where `<tag>` is the
 provenance tag (whitespace-stripped, otherwise verbatim), `<data>` (`YYYY_YYYY`) is the data span,
-`tw<baseline>` (`twYYYY_YYYY`) is the baseline-window years, and `<project>_<author>` is the publication
+`tw<baseline>` (`twYYYY_YYYY`) is the baseline-window years, and `<product_name>_<author>` is the publication
 descriptor (e.g. `LocalGP_Giglio_etal2026`).
 
 ```
@@ -84,10 +84,10 @@ first, then the series) with [`parity.py`](parity.py).
 
 ```bash
 python gcos.py derive_<tag>_*.nc --tag GCOS-2026-OP20260127b --code-version URL \
-    --project LocalGP --author Giglio_etal2026 --citation "…" [--provenance-link URL] [--j-to-zj 1e-21] [--out DIR]
+    --product-name LocalGP --author Giglio_etal2026 --citation "…" [--provenance-link URL] [--j-to-zj 1e-21] [--out DIR]
 ```
 
-`--project` / `--author` become the filename's trailing pair (`…_<project>_<author>.nc`) and are recorded
+`--product-name` / `--author` become the filename's trailing pair (`…_<product_name>_<author>.nc`) and are recorded
 in `config_record`; `--citation` is written to a standalone top-level `citation` attribute.
 
 See [`gcos.slurm`](gcos.slurm) for a real run.
@@ -101,7 +101,7 @@ See [`gcos.slurm`](gcos.slurm) for a real run.
 | `--provenance-link` | *(none)* | URL/path to the provenance record; written to the `provenance_link` attr. |
 | `--code-version` | *(required)* | URL to the exact ohc_gcos_emitter code (commit/release); written to the `ohc_gcos_emitter_code_version` attr. |
 | `--j-to-zj` | `1e-21` | `OHCA_ZJ` scale — `1e-21` = true zettajoules; `1e-15` byte-matches the original's (mislabelled petajoule) `_ZJ` column. |
-| `--project` | *(required)* | project string; first of the filename's trailing pair (whitespace-stripped, case preserved), a standalone top-level `project` attr, and recorded in `config_record`. |
+| `--product-name` | *(required)* | product_name string; first of the filename's trailing pair (whitespace-stripped, case preserved), a standalone top-level `product_name` attr, and recorded in `config_record`. |
 | `--author` | *(required)* | author string; last of the filename's trailing pair (e.g. `Giglio_etal2026`) and recorded in `config_record`. |
 | `--citation` | *(required)* | citation sentence; written to the standalone top-level `citation` attr (kept out of `config_record` so it isn't duplicated). |
 | `--out` | `.` | output directory (created if absent). |
