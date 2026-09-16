@@ -21,7 +21,7 @@ cd $SLURM_SUBMIT_DIR
 tag=260908-OP20260507
 project=LocalGP
 author=Giglio_etal2026
-citation="Giglio, D. et al. (2026): LocalGP GCOS ocean heat content anomaly. DOI: <fill in on deposit>."
+citation="Giglio, D., Sukianto, T., Kuusela, M., & Mills, K. (2026). Global Ocean Heat Content Anomalies and Ocean Heat Uptake based on mapping Argo data using local Gaussian processes (Version 4.1.0) [Dataset]. https://doi.org/10.5281/zenodo.22757913"
 results=/scratch/alpine/wimi7695/ohc_prod/results_260908
 window=$1
 # derive names carry the data span too (derive_<tag>_<data>_tw<baseline>_<level>.nc); $window is the
